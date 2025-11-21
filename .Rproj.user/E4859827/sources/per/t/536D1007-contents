@@ -1,0 +1,77 @@
+library(shinydashboard)
+library(DT) #install.packages("DT")
+library(readr)
+library(readxl)
+
+
+ui <- dashboardPage(
+  dashboardHeader(title = "Basic dashboard"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Show Data", tabName = "showdata", icon = icon("file")),
+      menuItem("Data Science Analysis", tabName = "datasains", icon = icon("camera"))
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "showdata",
+              h2("Ini adalah menu tampilkan Data"),
+              br(),
+              br(),
+              DTOutput("showdataku")
+        
+        ),
+      tabItem(tabName = "datasains",
+              h2("Ini adalah menu analsisi Data Science"),
+              br(),
+              tabBox(width = 12,
+                tabPanel("Summary",
+                  h3("ini adalah tab 1"),
+                  selectInput("pilihvaraibelku", "Pilih variabel", choices = names(iris), multiple = TRUE, selected = "Sepal.Length"),
+                  br(),
+                  verbatimTextOutput("apasih")
+                  
+                  ),
+                tabPanel("Visualisasi",
+                  h3("ini adalah tab 2"),
+                  selectInput("pilihvaraibel", "Pilih variabel", choices = names(iris)),
+                  br(),
+                  
+                  fluidRow(
+                    box(plotOutput("plot1", height = 250)),
+                    box(
+                      title = "Controls",
+                      sliderInput("sliderku", "Number of observations:", 1, 150, 100)
+                    )
+                  )
+                 )
+              )
+        )
+    )
+  )
+)
+
+server <- function(input, output) {
+ 
+  #ini tampilan data
+  output$showdataku <- renderDT({
+    iris
+  })
+  
+  #ini utnuk deskriptif
+  output$apasih <- renderPrint({
+    dataku<-iris[,input$pilihvaraibelku]
+    summary(dataku)
+  })
+  
+  #ini untuk plot
+  
+  output$plot1 <- renderPlot({
+    histdata<-iris[,input$pilihvaraibel]
+    data <- histdata[seq_len(input$sliderku)]
+    hist(data)
+  })
+  
+}
+
+shinyApp(ui, server)

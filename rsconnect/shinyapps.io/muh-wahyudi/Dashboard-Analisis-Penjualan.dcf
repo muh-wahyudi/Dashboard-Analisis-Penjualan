@@ -1,0 +1,13 @@
+name: Dashboard-Analisis-Penjualan
+title: Dashboard-Analisis-Penjualan
+username: muh-wahyudi
+account: muh-wahyudi
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16136020
+bundleId: 11211965
+url: https://muh-wahyudi.shinyapps.io/Dashboard-Analisis-Penjualan/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData

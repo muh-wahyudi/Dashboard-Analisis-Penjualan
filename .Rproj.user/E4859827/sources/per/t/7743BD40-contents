@@ -1,0 +1,113 @@
+library(shiny)
+library(shinydashboard)
+library(readr)
+library(readxl)
+library(DT)
+
+ui <- dashboardPage(
+  dashboardHeader(title = "Dashboard Simple"),
+  
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Data & Analisis", tabName = "data", icon = icon("chart-line"))
+    )
+  ),
+  
+  dashboardBody(
+    tabItems(
+      tabItem(
+        tabName = "data",
+        
+        h3("Upload File"),
+        fileInput("file", "Pilih CSV atau Excel"),
+        DTOutput("tabel"),
+        hr(),
+        
+        h3("Produk Paling Laku (Otomatis)"),
+        DTOutput("produkLaku")
+      )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  
+  # ===== LOAD + CLEANING SANGAT SIMPLE =====
+  dataClean <- reactive({
+    req(input$file)
+    
+    ext <- tools::file_ext(input$file$name)
+    data <- if (ext == "csv") {
+      read_csv(input$file$datapath)
+    } else {
+      read_excel(input$file$datapath)
+    }
+    
+    # Bersihkan kolom kosong
+    data <- data[, colSums(!is.na(data)) > 0]
+    
+    # Isi NA teks
+    for (i in seq_along(data)) {
+      if (is.character(data[[i]])) {
+        data[[i]][is.na(data[[i]]) | data[[i]] == ""] <- "Tidak diketahui"
+      }
+    }
+    
+    return(data)
+  })
+  
+  # ===== TAMPILKAN DATA =====
+  output$tabel <- renderDT({
+    req(dataClean())
+    dataClean()
+  })
+  
+  # ===== PRODUK PALING LAKU TANPA DPLYR =====
+  output$produkLaku <- renderDT({
+    req(dataClean())
+    data <- dataClean()
+    
+    # Cari kolom produk secara otomatis (berdasarkan kata)
+    namaKolom <- tolower(names(data))
+    
+    idxProduk <- grep("produk|barang|merk|type|nama.*hp|tipe", namaKolom)
+    
+    if (length(idxProduk) == 0) {
+      return(DT::datatable(data.frame(Pesan = "Tidak ditemukan kolom produk.")))
+    }
+    
+    kolomProduk <- data[[idxProduk[1]]]
+    
+    # Cari kolom jumlah (opsional)
+    idxJumlah <- grep("jumlah|qty|qty_jual|terjual", namaKolom)
+    
+    if (length(idxJumlah) == 0) {
+      # Jika tidak ada jumlah → setiap baris = 1 penjualan
+      jumlah <- rep(1, length(kolomProduk))
+    } else {
+      jumlah <- data[[idxJumlah[1]]]
+      jumlah[is.na(jumlah)] <- 1
+    }
+    
+    # Hitung total penjualan per produk (base R)
+    produkUnik <- unique(kolomProduk)
+    totalJual <- numeric(length(produkUnik))
+    
+    for (i in seq_along(produkUnik)) {
+      totalJual[i] <- sum(jumlah[kolomProduk == produkUnik[i]])
+    }
+    
+    hasil <- data.frame(
+      Produk = produkUnik,
+      Total_Jual = totalJual
+    )
+    
+    # Urutkan tanpa dplyr
+    hasil <- hasil[order(-hasil$Total_Jual), ]
+    
+    DT::datatable(hasil)
+  })
+  
+}
+
+shinyApp(ui, server)
