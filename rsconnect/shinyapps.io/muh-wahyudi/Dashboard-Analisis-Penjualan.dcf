@@ -5,7 +5,7 @@ account: muh-wahyudi
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 16136020
-bundleId: 11211965
+bundleId: 11220223
 url: https://muh-wahyudi.shinyapps.io/Dashboard-Analisis-Penjualan/
 version: 1
 asMultiple: FALSE

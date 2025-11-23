@@ -1,4 +1,4 @@
-# app.R (Theme Customizer - Model A, full)
+# app.R (Enhanced Dashboard - Premium Version)
 library(shiny)
 library(bs4Dash)
 library(shinyjs)
@@ -8,6 +8,8 @@ library(dplyr)
 library(ggplot2)
 library(readr)
 library(readxl)
+library(plotly)
+library(scales)
 
 # -------------------------------
 # Helper Functions
@@ -31,7 +33,7 @@ safe_rename <- function(df, old, new) {
 }
 
 # -------------------------------
-# Color palette (named keys)
+# Color palette
 # -------------------------------
 color_map <- list(
   primary = "#007bff", secondary = "#6c757d", info = "#17a2b8", success = "#28a745",
@@ -39,18 +41,18 @@ color_map <- list(
   purple = "#6f42c1", orange = "#fd7e14", teal = "#20c997", pink = "#e83e8c"
 )
 
-# Small helper to render clickable color boxes in UI
 colorBoxInput <- function(id, label, colors) {
   tagList(
-    tags$h5(label),
-    div(style = "display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;",
+    tags$h5(label, style = "font-weight:600; margin-bottom:10px;"),
+    div(style = "display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px;",
         lapply(names(colors), function(clr) {
           actionButton(
             inputId = paste0(id, "_", clr),
             label = NULL,
             style = paste0(
               "background-color:", colors[[clr]], ";",
-              "border:2px solid transparent; width:28px; height:28px; border-radius:4px; cursor:pointer;"
+              "border:2px solid transparent; width:32px; height:32px; border-radius:6px; cursor:pointer;",
+              "transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
             ),
             class = "color-box",
             title = clr
@@ -64,96 +66,237 @@ colorBoxInput <- function(id, label, colors) {
 # UI
 # -------------------------------
 ui <- bs4DashPage(
-  title = "Dashboard Penjualan - Themer (Model A)",
-  header = bs4DashNavbar(),
+  title = "Dashboard Penjualan Premium",
+  header = bs4DashNavbar(
+    title = tags$div(
+      icon("chart-line"), 
+      " Dashboard Penjualan", 
+      style = "font-weight:700; font-size:20px;"
+    )
+  ),
   sidebar = bs4DashSidebar(
     skin = "light",
     status = "primary",
     bs4SidebarMenu(
-      bs4SidebarHeader("Dashboard"),
+      bs4SidebarHeader("MENU UTAMA"),
       bs4SidebarMenuItem("Dashboard Penjualan", tabName = "data", icon = icon("table")),
       bs4SidebarMenuItem("Analisis Penjualan", tabName = "analisis", icon = icon("chart-line"))
     )
   ),
   controlbar = bs4DashControlbar(
+    skin = "light",
+    title = "Theme Customizer",
     bs4Card(
-      title = "Theme Customizer",
+      title = tags$div(icon("palette"), " Customizer Tema"),
       solidHeader = TRUE,
       width = 12,
-      # Navbar themer
-      colorBoxInput("navbar_color", "Navbar Themer", color_map),
-      # Sidebar themer + dark toggle
-      colorBoxInput("sidebar_color", "Sidebar Themer", color_map),
-      checkboxInput("sidebar_dark", "Sidebar Dark Mode", FALSE),
-      # Accent themer
-      colorBoxInput("accent_color", "Accents Themer (Primary)", color_map),
-      tags$hr(),
-      p(style = "font-size:12px; color:#666;", "Click a color box to apply theme. Model A: immediate theme update.")
+      status = "primary",
+      colorBoxInput("navbar_color", "🎨 Warna Navbar", color_map),
+      colorBoxInput("sidebar_color", "📌 Warna Sidebar", color_map),
+      checkboxInput("sidebar_dark", "Mode Sidebar Gelap", FALSE),
+      colorBoxInput("accent_color", "✨ Warna Aksen", color_map),
+      tags$hr(style = "margin:20px 0; border-top:2px solid #e0e0e0;"),
+      div(style = "padding:12px; background:#f8f9fa; border-radius:6px;",
+          tags$p(style = "font-size:13px; color:#666; margin:0; line-height:1.6;",
+                 icon("info-circle"), " Klik kotak warna untuk mengubah tema.",
+                 tags$br(),
+                 tags$small("💡 Tip: Coba kombinasi dengan Dark Mode!")
+          )
+      )
     )
   ),
   body = bs4DashBody(
     useShinyjs(),
-    uiOutput("ui_fresh_theme"),    # inject theme dynamically
+    uiOutput("ui_fresh_theme"),
     tags$style(HTML("
-      /* highlight selected color */
-      .color-box.selected { border-color: #000 !important; box-shadow: 0 0 6px rgba(0,0,0,0.25); }
-      /* spacing fix for controlbar */
-      .controlbar .card { margin-bottom:12px; }
+      .color-box.selected { 
+        border-color: #000 !important; 
+        box-shadow: 0 0 12px rgba(0,0,0,0.4) !important;
+        transform: scale(1.15) !important;
+      }
+      .color-box:hover {
+        transform: scale(1.08);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+      }
+      .info-box {
+        transition: all 0.3s ease;
+      }
+      .info-box:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      }
+      .card {
+        transition: box-shadow 0.3s ease;
+      }
+      .card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      }
+      .btn-download {
+        margin: 8px 4px;
+        transition: all 0.3s ease;
+      }
+      .btn-download:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
     ")),
     
     bs4TabItems(
-      # data tab
+      # DATA TAB
       bs4TabItem(
         tabName = "data",
         fluidRow(
+          valueBoxOutput("vbox_total_records", width = 3),
+          valueBoxOutput("vbox_total_merk", width = 3),
+          valueBoxOutput("vbox_total_type", width = 3),
+          valueBoxOutput("vbox_avg_harga", width = 3)
+        ),
+        fluidRow(
           bs4Card(
-            width = 12, title = "Upload File", status = "primary", solidHeader = TRUE,
-            fileInput("file", "File CSV / Excel", accept = c(".csv",".xlsx"))
+            width = 12, 
+            title = tags$div(icon("upload"), " Upload File Data Penjualan"), 
+            status = "primary", 
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            fileInput("file", "Pilih File CSV atau Excel", 
+                      accept = c(".csv",".xlsx",".xls"),
+                      buttonLabel = "Browse...",
+                      placeholder = "Belum ada file yang dipilih"),
+            tags$div(style = "margin-top:12px;",
+                     tags$p(style = "color:#666; font-size:13px;",
+                            icon("info-circle"), " Format yang didukung: CSV, XLSX, XLS",
+                            tags$br(),
+                            "📊 Pastikan file memiliki kolom: Merk, Type, Harga"
+                     )
+            )
           )
         ),
         fluidRow(
           bs4Card(
-            width = 12, title = "Preview Data", status = "primary", solidHeader = TRUE,
+            width = 12, 
+            title = tags$div(icon("table"), " Preview Data"), 
+            status = "info", 
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            div(style = "margin-bottom:12px;",
+                downloadButton("download_data", "Download Data", class = "btn-primary btn-download", icon = icon("download")),
+                actionButton("refresh_data", "Refresh", class = "btn-info btn-download", icon = icon("sync"))
+            ),
             DTOutput("tabelData")
           )
         )
       ),
-      # analysis tab
+      
+      # ANALISIS TAB
       bs4TabItem(
         tabName = "analisis",
         fluidRow(
           bs4Card(
             width = 12,
-            title = "Grafik & Tabel Penjualan Berdasarkan Merk",
-            status = "info", solidHeader = TRUE,
-            plotOutput("grafikMerk", height = "450px"),
-            DTOutput("tabelMerk")
+            title = tags$div(icon("chart-bar"), " Analisis Penjualan per Merk"),
+            status = "success", 
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            fluidRow(
+              column(6,
+                     div(style = "padding:12px;",
+                         tags$h5("📊 Grafik Interaktif", style = "font-weight:600; margin-bottom:16px;"),
+                         plotlyOutput("grafikMerkInteractive", height = "450px"),
+                         div(style = "margin-top:12px;",
+                             downloadButton("download_merk_table", "Download Data", class = "btn-success btn-sm", icon = icon("download"))
+                         )
+                     )
+              ),
+              column(6,
+                     div(style = "padding:12px;",
+                         tags$h5("📋 Tabel Detail", style = "font-weight:600; margin-bottom:16px;"),
+                         DTOutput("tabelMerk")
+                     )
+              )
+            )
           )
         ),
         fluidRow(
           bs4Card(
             width = 12,
-            title = "Pilih Merk untuk Melihat Penjualan Berdasarkan Type",
-            status = "warning", solidHeader = TRUE,
-            selectInput("pilihMerk", "Pilih Merk:", choices = NULL),
-            plotOutput("grafikType", height = "450px"),
-            DTOutput("tabelType")
+            title = tags$div(icon("filter"), " Analisis Detail per Merk dan Type"),
+            status = "warning", 
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            fluidRow(
+              column(12,
+                     div(style = "background:#f8f9fa; padding:16px; border-radius:8px; margin-bottom:16px;",
+                         selectInput("pilihMerk", 
+                                     label = tags$div(icon("tag"), " Pilih Merk untuk Analisis:"), 
+                                     choices = NULL,
+                                     width = "100%")
+                     )
+              )
+            ),
+            fluidRow(
+              column(6,
+                     div(style = "padding:12px;",
+                         tags$h5("📈 Grafik Type", style = "font-weight:600; margin-bottom:16px;"),
+                         plotlyOutput("grafikTypeInteractive", height = "450px"),
+                         div(style = "margin-top:12px;",
+                             downloadButton("download_type_table", "Download Data", class = "btn-warning btn-sm", icon = icon("download"))
+                         )
+                     )
+              ),
+              column(6,
+                     div(style = "padding:12px;",
+                         tags$h5("📋 Tabel Detail Type", style = "font-weight:600; margin-bottom:16px;"),
+                         DTOutput("tabelType")
+                     )
+              )
+            )
+          )
+        ),
+        fluidRow(
+          bs4Card(
+            width = 12,
+            title = tags$div(icon("balance-scale"), " Perbandingan Top 5"),
+            status = "danger",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            collapsed = TRUE,
+            fluidRow(
+              column(6, 
+                     div(style = "padding:12px;",
+                         tags$h5("🏆 Top 5 Merk", style = "font-weight:600; text-align:center;"),
+                         plotlyOutput("comparisonMerk", height = "350px")
+                     )
+              ),
+              column(6, 
+                     div(style = "padding:12px;",
+                         tags$h5("🏆 Top 5 Type", style = "font-weight:600; text-align:center;"),
+                         plotlyOutput("comparisonType", height = "350px")
+                     )
+              )
+            )
           )
         )
       )
+    )
+  ),
+  footer = bs4DashFooter(
+    left = tags$div(
+      "Dashboard Penjualan Premium © 2025",
+      style = "color:#666;"
+    ),
+    right = tags$div(
+      icon("code"), " Built with R Shiny & bs4Dash",
+      style = "color:#666;"
     )
   )
 )
 
 # -------------------------------
-# Server
+# SERVER
 # -------------------------------
 server <- function(input, output, session) {
-  # reactive values to store selected keys (names from color_map)
   sel <- reactiveValues(nav = "primary", side = "primary", accent = "primary", side_dark = FALSE)
   
-  # Create observer for each color box button to update reactive value (navbar, sidebar, accent)
-  # We create observers dynamically to keep code concise
   for (clr in names(color_map)) {
     local({
       color_key <- clr
@@ -161,90 +304,71 @@ server <- function(input, output, session) {
       side_btn <- paste0("sidebar_color_", color_key)
       acc_btn <- paste0("accent_color_", color_key)
       
-      observeEvent(input[[nav_btn]], {
-        sel$nav <- color_key
-      }, ignoreInit = TRUE)
-      
-      observeEvent(input[[side_btn]], {
-        sel$side <- color_key
-      }, ignoreInit = TRUE)
-      
-      observeEvent(input[[acc_btn]], {
-        sel$accent <- color_key
-      }, ignoreInit = TRUE)
+      observeEvent(input[[nav_btn]], { sel$nav <- color_key }, ignoreInit = TRUE)
+      observeEvent(input[[side_btn]], { sel$side <- color_key }, ignoreInit = TRUE)
+      observeEvent(input[[acc_btn]], { sel$accent <- color_key }, ignoreInit = TRUE)
     })
   }
   
-  # Sidebar dark mode toggle
   observeEvent(input$sidebar_dark, {
     sel$side_dark <- isTRUE(input$sidebar_dark)
   }, ignoreInit = TRUE)
   
-  # Build reactive fresh theme based on selected colors
   theme_current <- reactive({
-    # map keys to hex
     nav_hex <- color_map[[sel$nav]]
     side_hex <- color_map[[sel$side]]
     acc_hex <- color_map[[sel$accent]]
     
     if (isTRUE(sel$side_dark)) {
       create_theme(
-        bs4dash_vars(
-          bs4dash_accent = acc_hex,
-          navbar_light_color = nav_hex,
-          navbar_light_active_color = nav_hex,
-          navbar_light_hover_color = nav_hex
-        ),
-        bs4dash_sidebar_dark(
-          bg = side_hex,
-          submenu_bg = side_hex,
-          submenu_color = "#fff"
-        ),
-        bs4dash_color(
-          blue = acc_hex
-        )
+        bs4dash_vars(bs4dash_accent = acc_hex, navbar_light_color = nav_hex),
+        bs4dash_sidebar_dark(bg = side_hex, submenu_bg = side_hex, submenu_color = "#fff"),
+        bs4dash_color(blue = acc_hex)
       )
     } else {
       create_theme(
-        bs4dash_vars(
-          bs4dash_accent = acc_hex,
-          navbar_light_color = nav_hex,
-          navbar_light_active_color = nav_hex,
-          navbar_light_hover_color = nav_hex
-        ),
-        bs4dash_sidebar_light(
-          bg = side_hex,
-          submenu_bg = side_hex,
-          submenu_color = "#000"
-        ),
-        bs4dash_color(
-          blue = acc_hex
-        )
+        bs4dash_vars(bs4dash_accent = acc_hex, navbar_light_color = nav_hex),
+        bs4dash_sidebar_light(bg = side_hex, submenu_bg = side_hex, submenu_color = "#000"),
+        bs4dash_color(blue = acc_hex)
       )
     }
   })
   
-  # Inject theme into UI reactively
-  output$ui_fresh_theme <- renderUI({
-    theme <- theme_current()
-    use_theme(theme)
-  })
+  output$ui_fresh_theme <- renderUI({ use_theme(theme_current()) })
   
-  # Visual highlight selected boxes (add/remove class)
   observe({
-    # remove selected style first
     runjs("$('.color-box').removeClass('selected');")
-    # add selected to navbar
     runjs(sprintf("$('#%s').addClass('selected');", paste0("navbar_color_", sel$nav)))
-    # add selected to sidebar
     runjs(sprintf("$('#%s').addClass('selected');", paste0("sidebar_color_", sel$side)))
-    # add selected to accent
     runjs(sprintf("$('#%s').addClass('selected');", paste0("accent_color_", sel$accent)))
   })
   
-  # -------------------------------
-  # Application: data handling (unchanged behavior)
-  # -------------------------------
+  # Value Boxes
+  output$vbox_total_records <- renderValueBox({
+    df <- dataAnalisis()
+    val <- if(!is.null(df)) nrow(df) else 0
+    valueBox(value = format(val, big.mark = ".", decimal.mark = ","), subtitle = "Total Records", icon = icon("database"), color = "primary")
+  })
+  
+  output$vbox_total_merk <- renderValueBox({
+    df <- dataAnalisis()
+    val <- if(!is.null(df) && "Merk" %in% names(df)) length(unique(df$Merk)) else 0
+    valueBox(value = val, subtitle = "Jumlah Merk", icon = icon("tags"), color = "info")
+  })
+  
+  output$vbox_total_type <- renderValueBox({
+    df <- dataAnalisis()
+    val <- if(!is.null(df) && "Type" %in% names(df)) length(unique(df$Type)) else 0
+    valueBox(value = val, subtitle = "Jumlah Type", icon = icon("list"), color = "success")
+  })
+  
+  output$vbox_avg_harga <- renderValueBox({
+    df <- dataAnalisis()
+    val <- if(!is.null(df) && "Harga" %in% names(df)) mean(df$Harga, na.rm = TRUE) else 0
+    valueBox(value = format_rupiah(val), subtitle = "Rata-rata Harga", icon = icon("money-bill-wave"), color = "warning")
+  })
+  
+  # Data Processing
   dataFile <- reactive({
     req(input$file)
     ext <- tolower(tools::file_ext(input$file$name))
@@ -272,7 +396,6 @@ server <- function(input, output, session) {
     df
   })
   
-  # update merk choices
   observe({
     df <- dataAnalisis()
     req(df)
@@ -284,104 +407,165 @@ server <- function(input, output, session) {
     if (isTRUE(sel$side_dark)) "cell-border stripe table-dark" else "stripe hover compact"
   })
   
+  # Tables
   output$tabelData <- renderDT({
     df <- dataAnalisis()
     req(df)
-    datatable(df, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class())
+    datatable(df, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class(), filter = 'top', rownames = FALSE)
   })
+  
+  observeEvent(input$refresh_data, {
+    showNotification("Data refreshed!", type = "message", duration = 2)
+  })
+  
+  output$download_data <- downloadHandler(
+    filename = function() { paste0("data_penjualan_", Sys.Date(), ".csv") },
+    content = function(file) { write.csv(dataAnalisis(), file, row.names = FALSE) }
+  )
   
   output$tabelMerk <- renderDT({
     df <- dataAnalisis()
     req(df)
-    if (!"Merk" %in% names(df)) {
-      return(datatable(data.frame(Info = "Kolom 'Merk' tidak ditemukan"), options = list(dom = 't')))
-    }
+    if (!"Merk" %in% names(df)) return(datatable(data.frame(Info = "Kolom 'Merk' tidak ditemukan"), options = list(dom = 't')))
     hasil <- df %>%
       group_by(Merk) %>%
       summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(total_unit))
     hasil$rata_rata_harga <- format_rupiah(hasil$rata_rata_harga)
-    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class())
+    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class(), rownames = FALSE)
   })
   
   output$tabelType <- renderDT({
     req(input$pilihMerk)
-    df <- dataAnalisis()
+    df <- dataAnalisis() %>% filter(Merk == input$pilihMerk)
     req(df)
-    if (!"Type" %in% names(df)) {
-      return(datatable(data.frame(Info = "Kolom 'Type' tidak ditemukan"), options = list(dom = 't')))
-    }
-    df2 <- df %>% filter(Merk == input$pilihMerk)
-    hasil <- df2 %>%
+    if (!"Type" %in% names(df)) return(datatable(data.frame(Info = "Kolom 'Type' tidak ditemukan"), options = list(dom = 't')))
+    hasil <- df %>%
       group_by(Type) %>%
       summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(total_unit))
     hasil$rata_rata_harga <- format_rupiah(hasil$rata_rata_harga)
-    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class())
+    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class(), rownames = FALSE)
   })
   
-  # Graph theme (keeps base font larger)
-  theme_dynamic <- reactive({
-    if (isTRUE(sel$side_dark)) {
-      theme_minimal(base_size = 16) +
-        theme(
-          plot.background = element_rect(fill = "#2b2b2b"),
-          panel.background = element_rect(fill = "#2b2b2b"),
-          panel.grid = element_line(color = "#444444"),
-          axis.text = element_text(color = "white", size = 14),
-          axis.title = element_text(color = "white", size = 16, face = "bold"),
-          plot.title = element_text(color = "white", size = 18, face = "bold", hjust = 0.5)
-        )
-    } else {
-      theme_minimal(base_size = 16) +
-        theme(
-          plot.background = element_rect(fill = "white"),
-          panel.background = element_rect(fill = "white"),
-          panel.grid = element_line(color = "#e0e0e0"),
-          axis.text = element_text(color = "black", size = 14),
-          axis.title = element_text(color = "black", size = 16, face = "bold"),
-          plot.title = element_text(color = "black", size = 18, face = "bold", hjust = 0.5)
-        )
-    }
-  })
-  
-  output$grafikMerk <- renderPlot({
+  # Interactive Charts
+  output$grafikMerkInteractive <- renderPlotly({
     df <- dataAnalisis()
     req(df)
-    if (!"Merk" %in% names(df)) { plot.new(); title("Kolom 'Merk' tidak ditemukan"); return() }
-    summaryMerk <- df %>% group_by(Merk) %>% summarise(total_unit = n(), .groups = "drop") %>% arrange(desc(total_unit))
-    summaryMerk$Merk_wrap <- sapply(summaryMerk$Merk, function(x) paste(strwrap(x, width = 16), collapse = "\n"))
-    max_y <- max(summaryMerk$total_unit, na.rm = TRUE)
-    ggplot(summaryMerk, aes(x = reorder(Merk_wrap, total_unit), y = total_unit, fill = total_unit)) +
-      geom_col(show.legend = FALSE) +
-      geom_text(aes(label = total_unit), vjust = -0.8, size = 6, fontface = "bold") +
-      coord_cartesian(ylim = c(0, max_y * 1.25)) +
-      scale_fill_gradient(low = "#3b82f6", high = "#06b6d4") +
-      labs(title = "Grafik Penjualan per Merk", x = "Merk", y = "Total Terjual") +
-      theme_dynamic() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 14), plot.margin = margin(18,12,50,12))
+    if (!"Merk" %in% names(df)) return(NULL)
+    
+    summaryMerk <- df %>% 
+      group_by(Merk) %>% 
+      summarise(total_unit = n(), rata_rata = mean(Harga, na.rm = TRUE), .groups = "drop") %>% 
+      arrange(desc(total_unit))
+    
+    plot_ly(summaryMerk, x = ~reorder(Merk, total_unit), y = ~total_unit, type = 'bar',
+            marker = list(color = ~total_unit, colorscale = 'Blues', line = list(color = 'rgb(8,48,107)', width = 1.5)),
+            text = ~paste0("Merk: ", Merk, "<br>Total: ", total_unit, " unit<br>Avg: ", format_rupiah(rata_rata)),
+            hoverinfo = 'text') %>%
+      layout(title = list(text = "📊 Penjualan per Merk", font = list(size = 18)),
+             xaxis = list(title = "Merk", tickangle = -45),
+             yaxis = list(title = "Total Terjual"),
+             plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black')) %>%
+      config(displayModeBar = TRUE, displaylogo = FALSE)
   })
   
-  output$grafikType <- renderPlot({
+  output$grafikTypeInteractive <- renderPlotly({
     req(input$pilihMerk)
     df <- dataAnalisis() %>% filter(Merk == input$pilihMerk)
     req(nrow(df) > 0)
-    if (!"Type" %in% names(df)) { plot.new(); title("Kolom 'Type' tidak ditemukan"); return() }
-    summaryType <- df %>% group_by(Type) %>% summarise(total_unit = n(), .groups = "drop") %>% arrange(desc(total_unit))
-    summaryType$Type_wrap <- sapply(summaryType$Type, function(x) paste(strwrap(x, width = 16), collapse = "\n"))
-    max_y <- max(summaryType$total_unit, na.rm = TRUE)
-    ggplot(summaryType, aes(x = reorder(Type_wrap, total_unit), y = total_unit, fill = total_unit)) +
-      geom_col(show.legend = FALSE) +
-      geom_text(aes(label = total_unit), vjust = -0.8, size = 5, fontface = "bold") +
-      coord_cartesian(ylim = c(0, max_y * 1.2)) +
-      scale_fill_gradient(low = "#f97316", high = "#facc15") +
-      labs(title = paste("Grafik Type untuk Merk:", input$pilihMerk), x = "Type", y = "Total Terjual") +
-      theme_dynamic() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 13), plot.margin = margin(12,12,40,12))
+    if (!"Type" %in% names(df)) return(NULL)
+    
+    summaryType <- df %>% 
+      group_by(Type) %>% 
+      summarise(total_unit = n(), rata_rata = mean(Harga, na.rm = TRUE), .groups = "drop") %>% 
+      arrange(desc(total_unit))
+    
+    plot_ly(summaryType, x = ~reorder(Type, total_unit), y = ~total_unit, type = 'bar',
+            marker = list(color = ~total_unit, colorscale = 'Oranges', line = list(color = 'rgb(139,69,19)', width = 1.5)),
+            text = ~paste0("Type: ", Type, "<br>Total: ", total_unit, " unit<br>Avg: ", format_rupiah(rata_rata)),
+            hoverinfo = 'text') %>%
+      layout(title = list(text = paste0("📈 Type untuk Merk: ", input$pilihMerk), font = list(size = 18)),
+             xaxis = list(title = "Type", tickangle = -45),
+             yaxis = list(title = "Total Terjual"),
+             plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black')) %>%
+      config(displayModeBar = TRUE, displaylogo = FALSE)
   })
+  
+  # Comparison Charts
+  output$comparisonMerk <- renderPlotly({
+    df <- dataAnalisis()
+    req(df)
+    if (!"Merk" %in% names(df)) return(NULL)
+    
+    top5 <- df %>% 
+      group_by(Merk) %>% 
+      summarise(total = n(), .groups = "drop") %>% 
+      top_n(5, total) %>%
+      arrange(desc(total))
+    
+    plot_ly(top5, labels = ~Merk, values = ~total, type = 'pie',
+            textinfo = 'label+percent',
+            marker = list(colors = c('#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'))) %>%
+      layout(plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black', size = 14))
+  })
+  
+  output$comparisonType <- renderPlotly({
+    df <- dataAnalisis()
+    req(df)
+    if (!"Type" %in% names(df)) return(NULL)
+    
+    top5 <- df %>% 
+      group_by(Type) %>% 
+      summarise(total = n(), .groups = "drop") %>% 
+      top_n(5, total) %>%
+      arrange(desc(total))
+    
+    plot_ly(top5, labels = ~Type, values = ~total, type = 'pie',
+            textinfo = 'label+percent',
+            marker = list(colors = c('#f97316', '#facc15', '#84cc16', '#22c55e', '#14b8a6'))) %>%
+      layout(plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
+             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black', size = 14))
+  })
+  
+  # Download handlers
+  output$download_merk_table <- downloadHandler(
+    filename = function() { paste0("analisis_merk_", Sys.Date(), ".csv") },
+    content = function(file) {
+      df <- dataAnalisis()
+      req(df)
+      if ("Merk" %in% names(df)) {
+        hasil <- df %>%
+          group_by(Merk) %>%
+          summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
+          arrange(desc(total_unit))
+        write.csv(hasil, file, row.names = FALSE)
+      }
+    }
+  )
+  
+  output$download_type_table <- downloadHandler(
+    filename = function() { paste0("analisis_type_", Sys.Date(), ".csv") },
+    content = function(file) {
+      req(input$pilihMerk)
+      df <- dataAnalisis() %>% filter(Merk == input$pilihMerk)
+      req(df)
+      if ("Type" %in% names(df)) {
+        hasil <- df %>%
+          group_by(Type) %>%
+          summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
+          arrange(desc(total_unit))
+        write.csv(hasil, file, row.names = FALSE)
+      }
+    }
+  )
 }
 
-# -------------------------------
-# Run App
-# -------------------------------
 shinyApp(ui, server)
