@@ -1,4 +1,3 @@
-# app.R (Enhanced Dashboard - Premium Version)
 library(shiny)
 library(bs4Dash)
 library(shinyjs)
@@ -100,8 +99,7 @@ ui <- bs4DashPage(
           tags$p(style = "font-size:13px; color:#666; margin:0; line-height:1.6;",
                  icon("info-circle"), " Klik kotak warna untuk mengubah tema.",
                  tags$br(),
-                 tags$small("💡 Tip: Coba kombinasi dengan Dark Mode!")
-          )
+                 tags$small("💡 Tip: Coba kombinasi dengan Dark Mode!"))
       )
     )
   ),
@@ -201,7 +199,9 @@ ui <- bs4DashPage(
               column(6,
                      div(style = "padding:12px;",
                          tags$h5("📊 Grafik Interaktif", style = "font-weight:600; margin-bottom:16px;"),
-                         plotlyOutput("grafikMerkInteractive", height = "450px"),
+                         div(style = "padding-bottom:60px;",  # <-- padding ekstra
+                             plotlyOutput("grafikMerkInteractive", height = "450px")
+                         ),
                          div(style = "margin-top:12px;",
                              downloadButton("download_merk_table", "Download Data", class = "btn-success btn-sm", icon = icon("download"))
                          )
@@ -237,7 +237,9 @@ ui <- bs4DashPage(
               column(6,
                      div(style = "padding:12px;",
                          tags$h5("📈 Grafik Type", style = "font-weight:600; margin-bottom:16px;"),
-                         plotlyOutput("grafikTypeInteractive", height = "450px"),
+                         div(style = "padding-bottom:60px;",  # <-- padding ekstra
+                             plotlyOutput("grafikTypeInteractive", height = "450px")
+                         ),
                          div(style = "margin-top:12px;",
                              downloadButton("download_type_table", "Download Data", class = "btn-warning btn-sm", icon = icon("download"))
                          )
@@ -259,18 +261,22 @@ ui <- bs4DashPage(
             status = "danger",
             solidHeader = TRUE,
             collapsible = TRUE,
-            collapsed = TRUE,
+            collapsed = FALSE,  # pastikan card terbuka
             fluidRow(
               column(6, 
                      div(style = "padding:12px;",
                          tags$h5("🏆 Top 5 Merk", style = "font-weight:600; text-align:center;"),
-                         plotlyOutput("comparisonMerk", height = "350px")
+                         div(style = "padding-bottom:60px;",  # <-- padding ekstra
+                             plotlyOutput("comparisonMerk", height = "450px")
+                         )
                      )
               ),
               column(6, 
                      div(style = "padding:12px;",
                          tags$h5("🏆 Top 5 Type", style = "font-weight:600; text-align:center;"),
-                         plotlyOutput("comparisonType", height = "350px")
+                         div(style = "padding-bottom:60px;",
+                             plotlyOutput("comparisonType", height = "350px")
+                         )
                      )
               )
             )
@@ -310,9 +316,7 @@ server <- function(input, output, session) {
     })
   }
   
-  observeEvent(input$sidebar_dark, {
-    sel$side_dark <- isTRUE(input$sidebar_dark)
-  }, ignoreInit = TRUE)
+  observeEvent(input$sidebar_dark, { sel$side_dark <- isTRUE(input$sidebar_dark) }, ignoreInit = TRUE)
   
   theme_current <- reactive({
     nav_hex <- color_map[[sel$nav]]
@@ -432,140 +436,111 @@ server <- function(input, output, session) {
       summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(total_unit))
     hasil$rata_rata_harga <- format_rupiah(hasil$rata_rata_harga)
-    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class(), rownames = FALSE)
+    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), class = dt_class(), rownames = FALSE)
+  })
+  
+  output$grafikMerkInteractive <- renderPlotly({
+    df <- dataAnalisis()
+    req(df)
+    if (!"Merk" %in% names(df)) return(NULL)
+    data_plot <- df %>%
+      group_by(Merk) %>%
+      summarise(total_unit = n(), .groups = "drop") %>%
+      arrange(desc(total_unit))
+    
+    p <- plot_ly(data_plot, x = ~Merk, y = ~total_unit, type = 'bar', marker = list(color = color_map$primary)) %>%
+      layout(title = "Total Unit per Merk", xaxis = list(title = ""), yaxis = list(title = "Jumlah Unit"), margin = list(b = 80))
+    
+    config(p, displayModeBar = "hover", displaylogo = FALSE)
+  })
+  
+  output$grafikTypeInteractive <- renderPlotly({
+    df <- dataAnalisis()
+    req(df)
+    merk_sel <- input$pilihMerk
+    req(merk_sel)
+    df <- df %>% filter(Merk == merk_sel)
+    if (!"Type" %in% names(df)) return(NULL)
+    data_plot <- df %>%
+      group_by(Type) %>%
+      summarise(total_unit = n(), .groups = "drop") %>%
+      arrange(desc(total_unit))
+    p <- plot_ly(data_plot, x = ~Type, y = ~total_unit, type = 'bar', marker = list(color = color_map$warning)) %>%
+      layout(title = paste("Total Unit per Type -", merk_sel), xaxis = list(title = ""), yaxis = list(title = "Jumlah Unit"), margin = list(b = 80))
+    config(p, displayModeBar = "hover", displaylogo = FALSE)
   })
   
   output$tabelType <- renderDT({
-    req(input$pilihMerk)
-    df <- dataAnalisis() %>% filter(Merk == input$pilihMerk)
+    df <- dataAnalisis()
     req(df)
+    merk_sel <- input$pilihMerk
+    req(merk_sel)
+    df <- df %>% filter(Merk == merk_sel)
     if (!"Type" %in% names(df)) return(datatable(data.frame(Info = "Kolom 'Type' tidak ditemukan"), options = list(dom = 't')))
     hasil <- df %>%
       group_by(Type) %>%
       summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(total_unit))
     hasil$rata_rata_harga <- format_rupiah(hasil$rata_rata_harga)
-    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), style = 'bootstrap4', class = dt_class(), rownames = FALSE)
+    datatable(hasil, options = list(pageLength = 10, scrollX = TRUE), class = dt_class(), rownames = FALSE)
   })
   
-  # Interactive Charts
-  output$grafikMerkInteractive <- renderPlotly({
-    df <- dataAnalisis()
-    req(df)
-    if (!"Merk" %in% names(df)) return(NULL)
-    
-    summaryMerk <- df %>% 
-      group_by(Merk) %>% 
-      summarise(total_unit = n(), rata_rata = mean(Harga, na.rm = TRUE), .groups = "drop") %>% 
-      arrange(desc(total_unit))
-    
-    plot_ly(summaryMerk, x = ~reorder(Merk, total_unit), y = ~total_unit, type = 'bar',
-            marker = list(color = ~total_unit, colorscale = 'Blues', line = list(color = 'rgb(8,48,107)', width = 1.5)),
-            text = ~paste0("Merk: ", Merk, "<br>Total: ", total_unit, " unit<br>Avg: ", format_rupiah(rata_rata)),
-            hoverinfo = 'text') %>%
-      layout(title = list(text = "📊 Penjualan per Merk", font = list(size = 18)),
-             xaxis = list(title = "Merk", tickangle = -45),
-             yaxis = list(title = "Total Terjual"),
-             plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black')) %>%
-      config(displayModeBar = TRUE, displaylogo = FALSE)
-  })
-  
-  output$grafikTypeInteractive <- renderPlotly({
-    req(input$pilihMerk)
-    df <- dataAnalisis() %>% filter(Merk == input$pilihMerk)
-    req(nrow(df) > 0)
-    if (!"Type" %in% names(df)) return(NULL)
-    
-    summaryType <- df %>% 
-      group_by(Type) %>% 
-      summarise(total_unit = n(), rata_rata = mean(Harga, na.rm = TRUE), .groups = "drop") %>% 
-      arrange(desc(total_unit))
-    
-    plot_ly(summaryType, x = ~reorder(Type, total_unit), y = ~total_unit, type = 'bar',
-            marker = list(color = ~total_unit, colorscale = 'Oranges', line = list(color = 'rgb(139,69,19)', width = 1.5)),
-            text = ~paste0("Type: ", Type, "<br>Total: ", total_unit, " unit<br>Avg: ", format_rupiah(rata_rata)),
-            hoverinfo = 'text') %>%
-      layout(title = list(text = paste0("📈 Type untuk Merk: ", input$pilihMerk), font = list(size = 18)),
-             xaxis = list(title = "Type", tickangle = -45),
-             yaxis = list(title = "Total Terjual"),
-             plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black')) %>%
-      config(displayModeBar = TRUE, displaylogo = FALSE)
-  })
-  
-  # Comparison Charts
   output$comparisonMerk <- renderPlotly({
     df <- dataAnalisis()
     req(df)
-    if (!"Merk" %in% names(df)) return(NULL)
-    
-    top5 <- df %>% 
-      group_by(Merk) %>% 
-      summarise(total = n(), .groups = "drop") %>% 
-      top_n(5, total) %>%
-      arrange(desc(total))
-    
-    plot_ly(top5, labels = ~Merk, values = ~total, type = 'pie',
-            textinfo = 'label+percent',
-            marker = list(colors = c('#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'))) %>%
-      layout(plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black', size = 14))
+    data_plot <- df %>%
+      group_by(Merk) %>%
+      summarise(total_unit = n(), .groups = "drop") %>%
+      arrange(desc(total_unit)) %>% head(5)
+    p <- plot_ly(data_plot, x = ~Merk, y = ~total_unit, type = 'bar', marker = list(color = color_map$danger)) %>%
+      layout(title = "Top 5 Merk Terlaris", margin = list(b = 80))
+    config(p, displayModeBar = "hover", displaylogo = FALSE)
   })
   
   output$comparisonType <- renderPlotly({
     df <- dataAnalisis()
     req(df)
-    if (!"Type" %in% names(df)) return(NULL)
-    
-    top5 <- df %>% 
-      group_by(Type) %>% 
-      summarise(total = n(), .groups = "drop") %>% 
-      top_n(5, total) %>%
-      arrange(desc(total))
-    
-    plot_ly(top5, labels = ~Type, values = ~total, type = 'pie',
-            textinfo = 'label+percent',
-            marker = list(colors = c('#f97316', '#facc15', '#84cc16', '#22c55e', '#14b8a6'))) %>%
-      layout(plot_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             paper_bgcolor = if(isTRUE(sel$side_dark)) '#2b2b2b' else 'white',
-             font = list(color = if(isTRUE(sel$side_dark)) 'white' else 'black', size = 14))
+    merk_sel <- input$pilihMerk
+    if (is.null(merk_sel)) return(NULL)
+    data_plot <- df %>%
+      filter(Merk == merk_sel) %>%
+      group_by(Type) %>%
+      summarise(total_unit = n(), .groups = "drop") %>%
+      arrange(desc(total_unit)) %>% head(5)
+    p <- plot_ly(data_plot, x = ~Type, y = ~total_unit, type = 'bar', marker = list(color = color_map$teal)) %>%
+      layout(title = paste("Top 5 Type -", merk_sel), margin = list(b = 80))
+    config(p, displayModeBar = "hover", displaylogo = FALSE)
   })
   
-  # Download handlers
   output$download_merk_table <- downloadHandler(
-    filename = function() { paste0("analisis_merk_", Sys.Date(), ".csv") },
+    filename = function() { paste0("data_merk_", Sys.Date(), ".csv") },
     content = function(file) {
       df <- dataAnalisis()
       req(df)
-      if ("Merk" %in% names(df)) {
-        hasil <- df %>%
-          group_by(Merk) %>%
-          summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
-          arrange(desc(total_unit))
-        write.csv(hasil, file, row.names = FALSE)
-      }
+      hasil <- df %>%
+        group_by(Merk) %>%
+        summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop")
+      write.csv(hasil, file, row.names = FALSE)
     }
   )
   
   output$download_type_table <- downloadHandler(
-    filename = function() { paste0("analisis_type_", Sys.Date(), ".csv") },
+    filename = function() { paste0("data_type_", Sys.Date(), ".csv") },
     content = function(file) {
-      req(input$pilihMerk)
-      df <- dataAnalisis() %>% filter(Merk == input$pilihMerk)
+      df <- dataAnalisis()
       req(df)
-      if ("Type" %in% names(df)) {
-        hasil <- df %>%
-          group_by(Type) %>%
-          summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop") %>%
-          arrange(desc(total_unit))
-        write.csv(hasil, file, row.names = FALSE)
-      }
+      merk_sel <- input$pilihMerk
+      req(merk_sel)
+      hasil <- df %>%
+        filter(Merk == merk_sel) %>%
+        group_by(Type) %>%
+        summarise(total_unit = n(), rata_rata_harga = mean(Harga, na.rm = TRUE), .groups = "drop")
+      write.csv(hasil, file, row.names = FALSE)
     }
   )
 }
 
+# -------------------------------
+# RUN APP
+# -------------------------------
 shinyApp(ui, server)
