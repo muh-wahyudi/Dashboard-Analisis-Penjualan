@@ -37,7 +37,7 @@ safe_rename <- function(df, old, new) {
 color_map <- list(
   primary = "#007bff", secondary = "#6c757d", info = "#17a2b8", success = "#28a745",
   warning = "#ffc107", danger = "#dc3545", dark = "#343a40", light = "#f8f9fa",
-  purple = "#6f42c1", orange = "#fd7e14", teal = "#20c997", pink = "#e83e8c"
+  purple = "#6f42c1", orange = "#fd7e14", teal = "#20c997", pink = "#e83e8c", terbaik ="#3847cf"
 )
 
 colorBoxInput <- function(id, label, colors) {
@@ -65,7 +65,7 @@ colorBoxInput <- function(id, label, colors) {
 # UI
 # -------------------------------
 ui <- bs4DashPage(
-  title = "Dashboard Penjualan Premium",
+  title = "Dashboard Penjualan kelompok 3",
   header = bs4DashNavbar(
     title = tags$div(
       icon("chart-line"), 
@@ -225,7 +225,7 @@ ui <- bs4DashPage(
             collapsible = TRUE,
             fluidRow(
               column(12,
-                     div(style = "background:#f8f9fa; padding:16px; border-radius:8px; margin-bottom:16px;",
+                     div(style = "background:#0bdbca; padding:16px; border-radius:8px; margin-bottom:16px;",
                          selectInput("pilihMerk", 
                                      label = tags$div(icon("tag"), " Pilih Merk untuk Analisis:"), 
                                      choices = NULL,
@@ -287,21 +287,19 @@ ui <- bs4DashPage(
   ),
   footer = bs4DashFooter(
     left = tags$div(
-      "Dashboard Penjualan Premium © 2025",
-      style = "color:#666;"
-    ),
-    right = tags$div(
-      icon("code"), " Built with R Shiny & bs4Dash",
-      style = "color:#666;"
-    )
+      tags$a(
+        "Kelompok 3", 
+        href = "https://www.kaggle.com/datasets/abdurrahmansumbul/data-penjualan-toko-hp", 
+        style = "color:#007bff;"
+      ),
   )
 )
-
+)
 # -------------------------------
 # SERVER
 # -------------------------------
 server <- function(input, output, session) {
-  sel <- reactiveValues(nav = "primary", side = "primary", accent = "primary", side_dark = FALSE)
+  sel <- reactiveValues(nav = "primary", side = "terbaik", accent = "primary", side_dark = FALSE)
   
   for (clr in names(color_map)) {
     local({
