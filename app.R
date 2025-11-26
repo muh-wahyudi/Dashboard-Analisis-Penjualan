@@ -15,12 +15,13 @@ library(fresh)
 library(ggplot2)
 library(scales)
 library(RColorBrewer)
+library(rlang) # PENTING: Menambahkan rlang untuk operator %||%
 
 # -----------------------
 # CONFIG
 # -----------------------
-DB_FILE <- "users.sqlite"      
-FREE_UPLOADS <- 3          
+DB_FILE <- "users.sqlite" 
+FREE_UPLOADS <- 3 
 APP_TITLE <- "Dashboard Penjualan - Premium Berfitur"
 
 # -----------------------
@@ -113,6 +114,28 @@ reset_uploads_used <- function(email) {
   con <- db_connect(); on.exit(dbDisconnect(con), add = TRUE)
   dbExecute(con, "UPDATE users SET uploads_used = 0 WHERE email = ?", params = list(email))
   TRUE
+}
+
+delete_user_by_email <- function(email) {
+  con <- db_connect(); on.exit(dbDisconnect(con), add = TRUE)
+  
+  # 1. Cek peran user yang akan dihapus
+  user_to_delete <- get_user_by_email(email)
+  if (is.null(user_to_delete)) return("User not found")
+  
+  # 2. Safety Check: Mencegah penghapusan akun admin
+  if (identical(user_to_delete$role, "admin")) {
+    return("Cannot delete admin account")
+  }
+  
+  # 3. Eksekusi penghapusan
+  tryCatch({
+    dbExecute(con, "DELETE FROM users WHERE email = ?", params = list(email))
+    return("Success")
+  }, error = function(e) {
+    message("DB Error deleting user: ", e$message)
+    return("DB Error")
+  })
 }
 
 # -------------------------------
@@ -214,7 +237,7 @@ ui <- bs4DashPage(
       bs4SidebarMenuItem("Account/Upload", tabName = "home", icon = icon("user")),
       bs4SidebarMenuItem("Analisis Penjualan", tabName = "analisis", icon = icon("chart-line")),
       bs4SidebarMenuItem("Profile team", tabName = "team", icon = icon("users")),
-      bs4SidebarMenuItem("Admin Panel", tabName = "admin", icon = icon("user-shield"))
+      uiOutput("admin_panel_menu_ui") # Diubah menjadi uiOutput
     )
   ),
   
@@ -364,7 +387,7 @@ ui <- bs4DashPage(
       bs4TabItem(
         tabName = "admin",
         fluidRow(
-          bs4Card(width = 12, title = "Admin Panel - Manage Stars", status = "danger", solidHeader = TRUE,
+          bs4Card(width = 12, title = "Admin Panel - Manage Stars/Users", status = "danger", solidHeader = TRUE,
                   fluidRow(
                     column(width = 4,
                            textInput("admin_search_email", "Cari user (email)"),
@@ -379,7 +402,8 @@ ui <- bs4DashPage(
                     column(width = 4,
                            uiOutput("admin_selected_ui"),
                            numericInput("admin_star_delta", "Jumlah bintang (positif=Tambah, negatif=Kurangi)", value = 1, min = -1000, max = 1000),
-                           actionButton("admin_apply_btn", "Apply", class = "btn-success", style = "width:100%; margin-top:8px;")
+                           actionButton("admin_apply_btn", "Apply", class = "btn-success", style = "width:100%; margin-top:8px;"),
+                           actionButton("admin_delete_btn", "Hapus User", class = "btn-danger", style = "width:100%; margin-top:8px;")
                     ),
                     column(width = 8,
                            verbatimTextOutput("admin_log")
@@ -438,6 +462,15 @@ server <- function(input, output, session) {
   
   user_session <- reactiveValues(logged_in = FALSE, email = NULL, role = NULL)
   rv <- reactiveValues(data = NULL, admin_selected_email = NULL)
+  
+  # Logika untuk menampilkan menu Admin Panel (BARU)
+  output$admin_panel_menu_ui <- renderUI({
+    if (isTRUE(user_session$logged_in) && identical(user_session$role, "admin")) {
+      bs4SidebarMenuItem("Admin Panel", tabName = "admin", icon = icon("user-shield"))
+    } else {
+      NULL
+    }
+  })
   
   # -------- Theme Selector --------
   sel <- reactiveValues(nav = "primary", side = "terbaik", accent = "primary", side_dark = FALSE)
@@ -563,7 +596,6 @@ server <- function(input, output, session) {
     showNotification("Anda telah logout.", type = "message")
     
     output$admin_users_dt <- renderDT({ datatable(data.frame(Msg = "Hanya admin dapat melihat tabel ini"), options = list(dom = 't')) })
-    # output$tabelData TIDAK LAGI DITIMPA DI SINI
   })
   
   # Status Card UI builder
@@ -968,6 +1000,61 @@ server <- function(input, output, session) {
       })
     } else {
       showNotification("Gagal mengubah bintang (mungkin akan menjadi negatif).", type = "error")
+    }
+  })
+  
+  # admin delete user
+  observeEvent(input$admin_delete_btn, {
+    req(user_session$logged_in)
+    
+    # 1. Cek Admin Role
+    if (!identical(user_session$role, "admin")) { 
+      showNotification("Hanya admin dapat melakukan aksi ini.", type = "error"); return() 
+    }
+    
+    # 2. Tentukan target user
+    target <- rv$admin_selected_email %||% trimws(input$admin_search_email %||% "")
+    if (is.null(target) || target == "") { 
+      showNotification("Pilih atau cari user terlebih dahulu.", type = "warning"); return() 
+    }
+    
+    # 3. Konfirmasi sebelum hapus (opsional, tapi disarankan)
+    showModal(modalDialog(
+      title = "Konfirmasi Penghapusan",
+      paste("Apakah Anda yakin ingin menghapus user:", target, "? Aksi ini tidak dapat dibatalkan."),
+      footer = tagList(
+        modalButton("Batal"),
+        actionButton("confirm_delete_user", "Hapus Sekarang", class = "btn-danger")
+      )
+    ))
+  })
+  
+  # Logika penghapusan setelah konfirmasi
+  observeEvent(input$confirm_delete_user, {
+    removeModal()
+    target <- rv$admin_selected_email %||% trimws(input$admin_search_email %||% "")
+    
+    if (is.null(target) || target == "") {
+      showNotification("Target tidak valid.", type = "error"); return()
+    }
+    
+    # Panggil fungsi penghapusan dengan safety check
+    result <- delete_user_by_email(target)
+    
+    if (result == "Success") {
+      logmsg <- paste0(Sys.time(), " | Admin ", user_session$email, " deleted user ", target)
+      output$admin_log <- renderText({ paste0(logmsg, "\n\nOperation successful.") })
+      showNotification(paste("User", target, "berhasil dihapus."), type = "message")
+      
+      # Reset tampilan dan refresh tabel admin
+      rv$admin_selected_email <- NULL
+      output$admin_selected_ui <- renderUI({ tags$p("User berhasil dihapus.") })
+      output$admin_users_dt <- renderDT({ datatable(fetch_all_users(), selection = "single", options = list(pageLength = 10, scrollX = TRUE)) })
+      
+    } else if (result == "Cannot delete admin account") {
+      showNotification("Gagal: Admin tidak dapat menghapus sesama akun admin.", type = "error")
+    } else {
+      showNotification(paste("Gagal menghapus user:", result), type = "error")
     }
   })
 }
