@@ -15,14 +15,14 @@ library(fresh)
 library(ggplot2)
 library(scales)
 library(RColorBrewer)
-library(rlang) # PENTING: Menambahkan rlang untuk operator %||%
+library(rlang) 
 
 # -----------------------
 # CONFIG
 # -----------------------
 DB_FILE <- "users.sqlite" 
 FREE_UPLOADS <- 3 
-APP_TITLE <- "Dashboard Penjualan - Premium Berfitur"
+APP_TITLE <- "Dashboard Penjualan"
 
 # -----------------------
 # DATABASE INIT & HELPERS
@@ -119,16 +119,13 @@ reset_uploads_used <- function(email) {
 delete_user_by_email <- function(email) {
   con <- db_connect(); on.exit(dbDisconnect(con), add = TRUE)
   
-  # 1. Cek peran user yang akan dihapus
   user_to_delete <- get_user_by_email(email)
   if (is.null(user_to_delete)) return("User not found")
   
-  # 2. Safety Check: Mencegah penghapusan akun admin
   if (identical(user_to_delete$role, "admin")) {
     return("Cannot delete admin account")
   }
   
-  # 3. Eksekusi penghapusan
   tryCatch({
     dbExecute(con, "DELETE FROM users WHERE email = ?", params = list(email))
     return("Success")
@@ -237,7 +234,7 @@ ui <- bs4DashPage(
       bs4SidebarMenuItem("Account/Upload", tabName = "home", icon = icon("user")),
       bs4SidebarMenuItem("Analisis Penjualan", tabName = "analisis", icon = icon("chart-line")),
       bs4SidebarMenuItem("Profile team", tabName = "team", icon = icon("users")),
-      uiOutput("admin_panel_menu_ui") # Diubah menjadi uiOutput
+      uiOutput("admin_panel_menu_ui") 
     )
   ),
   
@@ -427,17 +424,41 @@ ui <- bs4DashPage(
               column(4,
                      div(style="text-align:center; padding:20px;",
                          img(src="foto1.jpg", width="90%", style="margin-bottom:15px;"),
-                         tags$h4("FIRMAN SYAH"), tags$p("Peran: Data Cleaning")
+                         tags$h4("FIRMAN SYAH"), 
+                         tags$p("Peran: Data Cleaning"),
+                         
+                         tags$a(
+                           href = "https://wa.me/<NOMOR WA>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           target = "_blank",
+                           class = "btn btn-success btn-sm",
+                           icon("whatsapp"), " Beli Stars (WhatsApp)"
+                         )
                      )),
               column(4,
                      div(style="text-align:center; padding:20px;",
                          img(src="foto2.jpg", width="90%", style="margin-bottom:15px;"),
-                         tags$h4("MUH.WAHYUDI"), tags$p("Peran: Data Visualization")
+                         tags$h4("MUH.WAHYUDI"), 
+                         tags$p("Peran: Data Visualization"),
+
+                         tags$a(
+                           href = "https://wa.me/<NOMOR WA>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           target = "_blank",
+                           class = "btn btn-success btn-sm",
+                           icon("whatsapp"), " Beli Stars (WhatsApp)"
+                         )
                      )),
               column(4,
                      div(style="text-align:center; padding:20px;",
                          img(src="foto3.jpg", width="90%", style="margin-bottom:15px;"),
-                         tags$h4("LUTFI ZHAFRAN"), tags$p("Peran: App Developer")
+                         tags$h4("LUTFI ZHAFRAN"), 
+                         tags$p("Peran: App Developer"),
+                         
+                         tags$a(
+                           href = "https://wa.me/<NOMOR WA>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           target = "_blank",
+                           class = "btn btn-success btn-sm",
+                           icon("whatsapp"), " Beli Stars (WhatsApp)"
+                         )
                      ))
             )
           )
@@ -447,7 +468,7 @@ ui <- bs4DashPage(
   ),
   
   footer = bs4DashFooter(
-    left = "Dashboard Penjualan Motor Second",
+    left = "Dashboard Analisis Penjualan",
     right = tagList(icon("code"), "Kelompok 2")
   )
 )
@@ -460,10 +481,12 @@ server <- function(input, output, session) {
   Sys.sleep(3)  
   waiter_hide()  
   
+  # Perubahan 1: Tambahkan user_update_trigger
   user_session <- reactiveValues(logged_in = FALSE, email = NULL, role = NULL)
-  rv <- reactiveValues(data = NULL, admin_selected_email = NULL)
+  rv <- reactiveValues(data = NULL, admin_selected_email = NULL,
+                       user_update_trigger = 0) # <--- BARU: Trigger Reaktivitas
   
-  # Logika untuk menampilkan menu Admin Panel (BARU)
+  # Logika untuk menampilkan menu Admin Panel
   output$admin_panel_menu_ui <- renderUI({
     if (isTRUE(user_session$logged_in) && identical(user_session$role, "admin")) {
       bs4SidebarMenuItem("Admin Panel", tabName = "admin", icon = icon("user-shield"))
@@ -472,7 +495,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # -------- Theme Selector --------
+  # -------- Theme Selector (Tidak berubah) --------
   sel <- reactiveValues(nav = "primary", side = "terbaik", accent = "primary", side_dark = FALSE)
   
   for(clr in names(color_map)){
@@ -513,8 +536,9 @@ server <- function(input, output, session) {
     runjs(sprintf("$('#%s').addClass('selected');", paste0("sidebar_color_", sel$side)))
     runjs(sprintf("$('#%s').addClass('selected');", paste0("accent_color_", sel$accent)))
   })
+  # ------------------------------------------------
   
-  # AUTH UI (top-right)
+  # AUTH UI
   output$auth_buttons_ui <- renderUI({
     if (!user_session$logged_in) {
       tagList(
@@ -529,7 +553,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Login modal
+  # Login/Register Modals & Logic (Tidak Berubah)
   observeEvent(input$btn_show_login, {
     showModal(modalDialog(
       title = "Login",
@@ -540,7 +564,6 @@ server <- function(input, output, session) {
     ))
   })
   
-  # Register modal
   observeEvent(input$btn_show_register, {
     showModal(modalDialog(
       title = "Register",
@@ -551,14 +574,10 @@ server <- function(input, output, session) {
     ))
   })
   
-  # perform register
   observeEvent(input$btn_register, {
     req(input$reg_email, input$reg_password)
     removeModal()
-    
-    # Otomatis memberikan 3 Bintang
     ok <- create_user(input$reg_email, input$reg_password, initial_stars = 3) 
-    
     if (isTRUE(ok)) {
       shinyjs::alert("Registrasi berhasil. Silakan login. Anda mendapatkan 3 Stars gratis.")
     } else {
@@ -566,7 +585,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # perform login
   observeEvent(input$btn_login, {
     req(input$login_email, input$login_password)
     removeModal()
@@ -582,24 +600,25 @@ server <- function(input, output, session) {
       showNotification(paste("Berhasil login:", user$email), type = "message")
       
       output$admin_users_dt <- renderDT({ datatable(fetch_all_users(), selection = "single", options = list(pageLength = 10, scrollX = TRUE)) })
+      # Panggil renderUI setelah login
       output$status_card_ui <- renderUI({ status_card_ui_func() })
       output$summary_ui <- renderUI({ summary_ui_func() })
     }
   })
   
-  # logout
   observeEvent(input$btn_logout, {
     user_session$logged_in <- FALSE
     user_session$email <- NULL
     user_session$role  <- NULL
-    rv$data <- NULL # Data direset
+    rv$data <- NULL 
     showNotification("Anda telah logout.", type = "message")
     
     output$admin_users_dt <- renderDT({ datatable(data.frame(Msg = "Hanya admin dapat melihat tabel ini"), options = list(dom = 't')) })
   })
   
-  # Status Card UI builder
-  status_card_ui_func <- function() {
+  # Perubahan 2: Status Card UI builder (Ubah menjadi reactive)
+  status_card_ui_func <- reactive({
+    rv$user_update_trigger # Pemicu Reaktif
     if (!user_session$logged_in) {
       return(tagList(tags$h4("Belum login"), tags$p("Silakan login atau daftar terlebih dahulu.")))
     }
@@ -614,12 +633,11 @@ server <- function(input, output, session) {
                if (user$role == "admin") tags$p(tags$em("Anda login sebagai admin."))
       )
     )
-  }
+  })
   
-  output$status_card_ui <- renderUI({ status_card_ui_func() })
-  
-  # Summary UI builder
-  summary_ui_func <- function() {
+  # Perubahan 3: Summary UI builder (Ubah menjadi reactive)
+  summary_ui_func <- reactive({
+    rv$user_update_trigger # Pemicu Reaktif
     if (!user_session$logged_in) return(tags$p("Login untuk melihat ringkasan akun."))
     user <- get_user_by_email(user_session$email)
     if (is.null(user)) return(tags$p("User tidak ditemukan"))
@@ -631,8 +649,10 @@ server <- function(input, output, session) {
       tags$p(strong("Uploads used:"), user$uploads_used),
       actionButton("btn_demo_reset", "Reset Uploads (Demo only)", class = "btn-link")
     )
-  }
+  })
   
+  # Panggil renderUI menggunakan fungsi reactive yang baru
+  output$status_card_ui <- renderUI({ status_card_ui_func() })
   output$summary_ui <- renderUI({ summary_ui_func() })
   
   # demo reset
@@ -640,15 +660,15 @@ server <- function(input, output, session) {
     req(user_session$logged_in)
     if (user_session$role == "admin" || user_session$email == "demo@local") {
       reset_uploads_used(user_session$email)
+      # Pemicu pembaruan UI setelah reset
+      rv$user_update_trigger <- rv$user_update_trigger + 1 
       showNotification("Uploads used direset (0).", type = "message")
-      output$status_card_ui <- renderUI({ status_card_ui_func() })
-      output$summary_ui <- renderUI({ summary_ui_func() })
     } else {
       showNotification("Aksi tidak diizinkan.", type = "error")
     }
   })
   
-  # UPLOAD UI
+  # UPLOAD UI (Tidak Berubah)
   output$upload_ui <- renderUI({
     if (!user_session$logged_in) return(tags$p("Silakan login untuk mengakses fitur upload."))
     user <- get_user_by_email(user_session$email)
@@ -676,7 +696,7 @@ server <- function(input, output, session) {
     showModal(modalDialog(title = "Hubungi Admin", "Hubungi admin lewat email: admin@local (demo).", easyClose = TRUE))
   })
   
-  # handle upload action
+  # handle upload action (Perbaikan Logika Reaktivitas)
   observeEvent(input$btn_do_upload, {
     req(user_session$logged_in)
     req(input$file_input_premium)
@@ -691,9 +711,11 @@ server <- function(input, output, session) {
       # decide cost
       if (user$role != "admin") {
         if (user$uploads_used < FREE_UPLOADS) {
+          # Transaksi 1: Gratis
           increment_upload_used(user$email)
           showNotification("Upload diterima (gratis).", type = "message")
         } else {
+          # Transaksi 2: Berbayar (menggunakan Stars)
           if (user$stars >= 1) {
             ok <- update_user_stars(user$email, -1)
             if (!ok) { showNotification("Gagal mengurangi bintang.", type = "error"); return() }
@@ -708,7 +730,7 @@ server <- function(input, output, session) {
         showNotification("Admin: upload diterima tanpa konsumsi.", type = "message")
       }
       
-      # read file safely and validate
+      # ... (Proses baca file dan validasi data) ...
       fp <- input$file_input_premium$datapath
       nm <- input$file_input_premium$name
       ext <- tools::file_ext(nm)
@@ -726,7 +748,6 @@ server <- function(input, output, session) {
         return()
       }
       
-      # Data processing (rename columns for analysis)
       col_merk <- detect_col(df, c("merk","brand","merek"))
       col_type <- detect_col(df, c("type","tipe"))
       col_harga <- detect_col(df, c("harga","price","total","amount","nominal","jumlah"))
@@ -734,13 +755,10 @@ server <- function(input, output, session) {
       df <- safe_rename(df, col_type, "Type")
       df <- safe_rename(df, col_harga, "Harga")
       
-      # Tambahkan cek validitas data KRITIS setelah rename
-      
       kolom_wajib_ada <- c("Merk", "Harga")
       if (!all(kolom_wajib_ada %in% names(df))) {
-        # Jika kolom wajib tidak ditemukan, tampilkan error dan JANGAN simpan data
         missing_cols <- setdiff(kolom_wajib_ada, names(df))
-        rv$data <- NULL # Pastikan data kosong
+        rv$data <- NULL 
         showNotification(
           paste("Gagal: Kolom wajib tidak ditemukan:", paste(missing_cols, collapse=", ")),
           type = "error", 
@@ -749,19 +767,19 @@ server <- function(input, output, session) {
         return() 
       }
       
-      # Konversi Harga setelah memastikan kolom ada
       df$Harga <- suppressWarnings(as.numeric(df$Harga))
       
       rv$data <- df
       
-      # refresh status UIs
-      output$status_card_ui <- renderUI({ status_card_ui_func() })
-      output$summary_ui <- renderUI({ summary_ui_func() })
+      # PENTING: Pemicu pembaruan status akun
+      rv$user_update_trigger <- rv$user_update_trigger + 1 
       
       showNotification("Data berhasil di-*upload* dan diproses! Lihat tab Analisis Penjualan.", type = "message")
       
     })
   })
+  
+  # ... (Sisa fungsi Server tidak ada perubahan signifikan pada bagian analisis data/Admin Panel) ...
   
   # Download Handler (Home tab)
   output$download_data_premium <- downloadHandler(
@@ -786,7 +804,7 @@ server <- function(input, output, session) {
   
   dt_class <- reactive({ if(isTRUE(sel$side_dark)) "cell-border stripe table-dark" else "stripe hover compact" })
   
-  # refresh data handler (hanya refresh tampilan, data dari rv$data)
+  # refresh data handler
   observeEvent(input$refresh_data, { 
     req(rv$data) 
     waiter_show(html = tagList(tags$h4("Memuat ulang data...")), color = "#ffffff")
@@ -827,7 +845,6 @@ server <- function(input, output, session) {
   })
   
   # -------- Tabel & Plot --------
-  # PERBAIKAN UTAMA: Sentralisasi logic tampilan data
   output$tabelData <- renderDT({
     df <- dataAnalisis()
     
@@ -931,14 +948,12 @@ server <- function(input, output, session) {
   # -----------------------
   output$admin_users_dt <- renderDT({ datatable(data.frame(Msg = "Hanya admin dapat melihat tabel ini"), options = list(dom = 't')) })
   
-  # if admin logged in, render full table
   observe({
     if (user_session$logged_in && identical(user_session$role, "admin")) {
       output$admin_users_dt <- renderDT({ datatable(fetch_all_users(), selection = "single", options = list(pageLength = 10, scrollX = TRUE)) })
     }
   })
   
-  # search by email
   observeEvent(input$admin_search_btn, {
     req(user_session$logged_in)
     if (!identical(user_session$role, "admin")) { showNotification("Hanya admin dapat melakukan aksi ini.", type = "error"); return() }
@@ -961,7 +976,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # when admin selects row in table
   observeEvent(input$admin_users_dt_rows_selected, {
     sel_row <- input$admin_users_dt_rows_selected
     if (length(sel_row) == 0) return()
@@ -976,7 +990,6 @@ server <- function(input, output, session) {
     })
   })
   
-  # admin apply stars
   observeEvent(input$admin_apply_btn, {
     req(user_session$logged_in)
     if (!identical(user_session$role, "admin")) { showNotification("Hanya admin.", type = "error"); return() }
@@ -998,27 +1011,25 @@ server <- function(input, output, session) {
                 tags$p(strong("Stars: "), tags$span(style = "color:#d97706; font-weight:700;", user$stars)),
                 tags$p(strong("Uploads used: "), user$uploads_used))
       })
+      # Pemicu pembaruan UI
+      rv$user_update_trigger <- rv$user_update_trigger + 1 
     } else {
       showNotification("Gagal mengubah bintang (mungkin akan menjadi negatif).", type = "error")
     }
   })
   
-  # admin delete user
   observeEvent(input$admin_delete_btn, {
     req(user_session$logged_in)
     
-    # 1. Cek Admin Role
     if (!identical(user_session$role, "admin")) { 
       showNotification("Hanya admin dapat melakukan aksi ini.", type = "error"); return() 
     }
     
-    # 2. Tentukan target user
     target <- rv$admin_selected_email %||% trimws(input$admin_search_email %||% "")
     if (is.null(target) || target == "") { 
       showNotification("Pilih atau cari user terlebih dahulu.", type = "warning"); return() 
     }
     
-    # 3. Konfirmasi sebelum hapus (opsional, tapi disarankan)
     showModal(modalDialog(
       title = "Konfirmasi Penghapusan",
       paste("Apakah Anda yakin ingin menghapus user:", target, "? Aksi ini tidak dapat dibatalkan."),
@@ -1029,7 +1040,6 @@ server <- function(input, output, session) {
     ))
   })
   
-  # Logika penghapusan setelah konfirmasi
   observeEvent(input$confirm_delete_user, {
     removeModal()
     target <- rv$admin_selected_email %||% trimws(input$admin_search_email %||% "")
@@ -1038,7 +1048,6 @@ server <- function(input, output, session) {
       showNotification("Target tidak valid.", type = "error"); return()
     }
     
-    # Panggil fungsi penghapusan dengan safety check
     result <- delete_user_by_email(target)
     
     if (result == "Success") {
@@ -1046,10 +1055,10 @@ server <- function(input, output, session) {
       output$admin_log <- renderText({ paste0(logmsg, "\n\nOperation successful.") })
       showNotification(paste("User", target, "berhasil dihapus."), type = "message")
       
-      # Reset tampilan dan refresh tabel admin
       rv$admin_selected_email <- NULL
       output$admin_selected_ui <- renderUI({ tags$p("User berhasil dihapus.") })
       output$admin_users_dt <- renderDT({ datatable(fetch_all_users(), selection = "single", options = list(pageLength = 10, scrollX = TRUE)) })
+      rv$user_update_trigger <- rv$user_update_trigger + 1 
       
     } else if (result == "Cannot delete admin account") {
       showNotification("Gagal: Admin tidak dapat menghapus sesama akun admin.", type = "error")
