@@ -22,7 +22,7 @@ library(rlang)
 # -----------------------
 DB_FILE <- "users.sqlite" 
 FREE_UPLOADS <- 3 
-APP_TITLE <- "Dashboard Penjualan"
+APP_TITLE <- "Dashboard Analisis Penjualan"
 
 # -----------------------
 # DATABASE INIT & HELPERS
@@ -300,12 +300,18 @@ ui <- bs4DashPage(
       # ================= TAB ANALISIS =================
       bs4TabItem(
         tabName = "analisis",
+        # --- Value Boxes Baru (2 baris) ---
         fluidRow(
           valueBoxOutput("vbox_total_records", width = 3),
           valueBoxOutput("vbox_total_merk", width = 3),
           valueBoxOutput("vbox_total_type", width = 3),
-          valueBoxOutput("vbox_avg_harga", width = 3)
+          valueBoxOutput("vbox_total_sales", width = 3) # BARU: Total Sales
         ),
+        fluidRow(
+          valueBoxOutput("vbox_avg_harga", width = 3)
+          # Placeholder untuk Value Box lain jika diperlukan
+        ),
+        # ----------------------------------
         
         fluidRow(
           bs4Card(
@@ -360,6 +366,22 @@ ui <- bs4DashPage(
             )
           )
         ),
+        
+        # --- BARU: Card Box Plot ---
+        fluidRow(
+          bs4Card(
+            width = 12,
+            title = tags$div(icon("chart-pie"), " Analisis Distribusi Harga (Box Plot)"),
+            status = "info",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            plotlyOutput("boxPlotHarga", height="400px"),
+            tags$small(style="color:#666; margin-top:10px; display:block;", 
+                       icon("info-circle"), " Grafik ini menunjukkan median (garis tengah), quartil, dan outlier (titik) harga jual setiap merek."
+            )
+          )
+        ),
+        # --------------------------
         
         fluidRow(
           bs4Card(
@@ -428,7 +450,7 @@ ui <- bs4DashPage(
                          tags$p("Peran: Data Cleaning"),
                          
                          tags$a(
-                           href = "https://wa.me/<NOMOR WA>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           href = "https://wa.me/<nomor wa>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
                            target = "_blank",
                            class = "btn btn-success btn-sm",
                            icon("whatsapp"), " Beli Stars (WhatsApp)"
@@ -441,11 +463,12 @@ ui <- bs4DashPage(
                          tags$p("Peran: Data Visualization"),
 
                          tags$a(
-                           href = "https://wa.me/<NOMOR WA>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           href = "https://wa.me/<nomor wa>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
                            target = "_blank",
                            class = "btn btn-success btn-sm",
                            icon("whatsapp"), " Beli Stars (WhatsApp)"
                          )
+
                      )),
               column(4,
                      div(style="text-align:center; padding:20px;",
@@ -454,7 +477,7 @@ ui <- bs4DashPage(
                          tags$p("Peran: App Developer"),
                          
                          tags$a(
-                           href = "https://wa.me/<NOMOR WA>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           href = "https://wa.me/<nomor wa>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
                            target = "_blank",
                            class = "btn btn-success btn-sm",
                            icon("whatsapp"), " Beli Stars (WhatsApp)"
@@ -481,10 +504,9 @@ server <- function(input, output, session) {
   Sys.sleep(3)  
   waiter_hide()  
   
-  # Perubahan 1: Tambahkan user_update_trigger
   user_session <- reactiveValues(logged_in = FALSE, email = NULL, role = NULL)
   rv <- reactiveValues(data = NULL, admin_selected_email = NULL,
-                       user_update_trigger = 0) # <--- BARU: Trigger Reaktivitas
+                       user_update_trigger = 0) 
   
   # Logika untuk menampilkan menu Admin Panel
   output$admin_panel_menu_ui <- renderUI({
@@ -616,9 +638,9 @@ server <- function(input, output, session) {
     output$admin_users_dt <- renderDT({ datatable(data.frame(Msg = "Hanya admin dapat melihat tabel ini"), options = list(dom = 't')) })
   })
   
-  # Perubahan 2: Status Card UI builder (Ubah menjadi reactive)
+  # Status Card UI builder (Ubah menjadi reactive)
   status_card_ui_func <- reactive({
-    rv$user_update_trigger # Pemicu Reaktif
+    rv$user_update_trigger 
     if (!user_session$logged_in) {
       return(tagList(tags$h4("Belum login"), tags$p("Silakan login atau daftar terlebih dahulu.")))
     }
@@ -635,9 +657,9 @@ server <- function(input, output, session) {
     )
   })
   
-  # Perubahan 3: Summary UI builder (Ubah menjadi reactive)
+  # Summary UI builder (Ubah menjadi reactive)
   summary_ui_func <- reactive({
-    rv$user_update_trigger # Pemicu Reaktif
+    rv$user_update_trigger 
     if (!user_session$logged_in) return(tags$p("Login untuk melihat ringkasan akun."))
     user <- get_user_by_email(user_session$email)
     if (is.null(user)) return(tags$p("User tidak ditemukan"))
@@ -696,7 +718,7 @@ server <- function(input, output, session) {
     showModal(modalDialog(title = "Hubungi Admin", "Hubungi admin lewat email: admin@local (demo).", easyClose = TRUE))
   })
   
-  # handle upload action (Perbaikan Logika Reaktivitas)
+  # handle upload action (Logika Bintang sudah diperbaiki)
   observeEvent(input$btn_do_upload, {
     req(user_session$logged_in)
     req(input$file_input_premium)
@@ -779,8 +801,6 @@ server <- function(input, output, session) {
     })
   })
   
-  # ... (Sisa fungsi Server tidak ada perubahan signifikan pada bagian analisis data/Admin Panel) ...
-  
   # Download Handler (Home tab)
   output$download_data_premium <- downloadHandler(
     filename = function() paste0("data_processed_", Sys.Date(), ".csv"),
@@ -836,6 +856,13 @@ server <- function(input, output, session) {
     df <- dataAnalisis()
     val <- if(!is.null(df) && "Type" %in% names(df)) length(unique(df$Type)) else 0
     valueBox(value=val, subtitle="Jumlah Type", icon=icon("list"), color="success")
+  })
+  
+  # --- Total Nilai Penjualan ---
+  output$vbox_total_sales <- renderValueBox({
+    df <- dataAnalisis()
+    val <- if(!is.null(df) && "Harga" %in% names(df)) sum(df$Harga, na.rm=TRUE) else 0
+    valueBox(value=format_rupiah(val), subtitle="Total Nilai Penjualan", icon=icon("hand-holding-usd"), color="danger")
   })
   
   output$vbox_avg_harga <- renderValueBox({
@@ -929,18 +956,62 @@ server <- function(input, output, session) {
     renderPlotlyGrafik(data_plot, "Type", "total_unit", input$pilih_grafik_type, paste("Total Unit per Type -", merk_sel))
   })
   
+  # --- Box Plot Harga per Merk ---
+  output$boxPlotHarga <- renderPlotly({
+    df <- dataAnalisis()
+    req(df)
+    
+    if (!all(c("Merk", "Harga") %in% names(df))) {
+      return(plot_ly() %>% layout(title = "Data tidak lengkap untuk Box Plot (Perlu kolom Merk dan Harga)"))
+    }
+    
+    df$Merk <- factor(df$Merk)
+    
+    p <- plot_ly(
+      data = df,
+      y = ~Harga,
+      color = ~Merk, 
+      type = "box", 
+      boxpoints = "outliers", 
+      name = ~Merk
+    ) %>%
+      layout(
+        title = "Distribusi Harga Jual per Merk",
+        yaxis = list(
+          title = "Harga (Rupiah)",
+          tickformat = ",.0f"
+        ),
+        xaxis = list(title = "Merk"),
+        showlegend = FALSE,
+        margin = list(b = 100)
+      ) %>%
+      config(displayModeBar = "hover", displaylogo = FALSE)
+    
+    return(p)
+  })
+  # -----------------------------
+  
   output$comparisonMerk <- renderPlotly({
     df <- dataAnalisis(); req(df)
     data_plot <- df %>% group_by(Merk) %>% summarise(total_unit=n(), .groups="drop") %>% arrange(desc(total_unit)) %>% head(5)
     renderPlotlyGrafik(data_plot, "Merk", "total_unit", input$pilih_grafik_top5, "Top 5 Merk Terlaris")
   })
   
+  # --- PERBAIKAN: Menggunakan input$pilih_grafik_top5 untuk Type Comparison ---
   output$comparisonType <- renderPlotly({
     df <- dataAnalisis(); req(df)
     merk_sel <- input$pilihMerk; req(merk_sel)
     data_plot <- df %>% filter(Merk==merk_sel) %>% group_by(Type) %>% summarise(total_unit=n(), .groups="drop") %>% arrange(desc(total_unit)) %>% head(5)
-    renderPlotlyGrafik(data_plot, "Type", "total_unit", "bar", paste("Top 5 Type -", merk_sel))
+    
+    renderPlotlyGrafik(
+      data_plot, 
+      "Type", 
+      "total_unit", 
+      input$pilih_grafik_top5, # <-- Perbaikan di sini
+      paste("Top 5 Type -", merk_sel)
+    )
   })
+  # --------------------------------------------------------------------------
   
   
   # -----------------------
