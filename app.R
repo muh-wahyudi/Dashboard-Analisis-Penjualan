@@ -21,8 +21,8 @@ library(rlang)
 # CONFIG
 # -----------------------
 DB_FILE <- "users.sqlite" 
-FREE_UPLOADS <- 3 
-APP_TITLE <- "Dashboard Analisis Penjualan"
+FREE_UPLOADS <- 0 
+APP_TITLE <- "KELOMPOK 2"
 
 # -----------------------
 # DATABASE INIT & HELPERS
@@ -230,10 +230,16 @@ ui <- bs4DashPage(
     skin = "light",
     status = "primary",
     bs4SidebarMenu(
+      
       bs4SidebarHeader("MENU UTAMA"),
-      bs4SidebarMenuItem("Account/Upload", tabName = "home", icon = icon("user")),
-      bs4SidebarMenuItem("Analisis Penjualan", tabName = "analisis", icon = icon("chart-line")),
-      bs4SidebarMenuItem("Profile team", tabName = "team", icon = icon("users")),
+      bs4SidebarMenuItem("Dashboard", tabName = "dashboard", icon = icon("home")),
+      
+      bs4SidebarHeader("ANALISIS"),
+      bs4SidebarMenuItem("Grafik", tabName = "grafik", icon = icon("chart-area")),
+      
+      bs4SidebarHeader("LAINNYA"),
+      bs4SidebarMenuItem("Profile Team", tabName = "team", icon = icon("users")),
+      
       uiOutput("admin_panel_menu_ui") 
     )
   ),
@@ -281,7 +287,7 @@ ui <- bs4DashPage(
       
       # ================= TAB HOME (ACCOUNT/UPLOAD) =================
       bs4TabItem(
-        tabName = "home",
+        tabName = "dashboard",
         fluidRow(
           bs4Card(width = 12, title = "Status Account", status = "info", solidHeader = TRUE,
                   uiOutput("status_card_ui")
@@ -294,12 +300,22 @@ ui <- bs4DashPage(
           bs4Card(width = 6, title = "Account Summary", status = "success", solidHeader = TRUE,
                   uiOutput("summary_ui")
           )
+        ),
+        fluidRow(
+          # Insight otomatis
+          box(
+            width = 12,
+            title = "Insight Otomatis",
+            status = "primary",
+            solidHeader = TRUE,
+            uiOutput("insightBox")
+          )
         )
       ),
       
       # ================= TAB ANALISIS =================
       bs4TabItem(
-        tabName = "analisis",
+        tabName = "grafik",
         # --- Value Boxes Baru (2 baris) ---
         fluidRow(
           valueBoxOutput("vbox_total_records", width = 3),
@@ -445,12 +461,12 @@ ui <- bs4DashPage(
             fluidRow(
               column(4,
                      div(style="text-align:center; padding:20px;",
-                         img(src="foto1.jpg", width="90%", style="margin-bottom:15px;"),
+                         img(src="foto ke 1.jpg", width="90%", style="margin-bottom:15px;"),
                          tags$h4("FIRMAN SYAH"), 
                          tags$p("Peran: Data Cleaning"),
                          
                          tags$a(
-                           href = "https://wa.me/<nomor wa>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           href = "https://wa.me/6287726993572?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan?",
                            target = "_blank",
                            class = "btn btn-success btn-sm",
                            icon("whatsapp"), " Beli Stars (WhatsApp)"
@@ -461,28 +477,43 @@ ui <- bs4DashPage(
                          img(src="foto2.jpg", width="90%", style="margin-bottom:15px;"),
                          tags$h4("MUH.WAHYUDI"), 
                          tags$p("Peran: Data Visualization"),
-
+                         
                          tags$a(
-                           href = "https://wa.me/<nomor wa>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           href =  "https://wa.me/6287846327517?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan?",
                            target = "_blank",
                            class = "btn btn-success btn-sm",
                            icon("whatsapp"), " Beli Stars (WhatsApp)"
                          )
-
+                         
                      )),
               column(4,
                      div(style="text-align:center; padding:20px;",
-                         img(src="foto3.jpg", width="90%", style="margin-bottom:15px;"),
+                         img(src="foto ke 2 .jpg", width="90%", style="margin-bottom:15px;"),
                          tags$h4("LUTFI ZHAFRAN"), 
                          tags$p("Peran: App Developer"),
                          
                          tags$a(
-                           href = "https://wa.me/<nomor wa>?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan.",
+                           href =  "https://wa.me/6287726993572?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan?",
                            target = "_blank",
                            class = "btn btn-success btn-sm",
                            icon("whatsapp"), " Beli Stars (WhatsApp)"
                          )
-                     ))
+                         
+                     )),
+              column( width = 4,
+                      offset = 4,
+                      div(style="text-align:center; padding:20px;",
+                          img(src="foto ke 3.jpg", width="90%", style="margin-bottom:15px;"),
+                          tags$h4("Nur Badilla Zayyan"), 
+                          tags$p("Peran: App Developer"),
+                          
+                          tags$a(
+                            href =  "https://wa.me/6287726993572?text=Halo%20saya%20tertarik%20untuk%20membeli%20stars%20di%20Dashboard%20Penjualan?",
+                            target = "_blank",
+                            class = "btn btn-success btn-sm",
+                            icon("whatsapp"), " Beli Stars (WhatsApp)"
+                          )
+                      ))
             )
           )
         )
@@ -516,6 +547,61 @@ server <- function(input, output, session) {
       NULL
     }
   })
+  # --- DATA PENJUALAN (letakkan di bagian ini) ---
+  data_sales <- reactive({
+    req(rv$data)
+    rv$data
+  })
+  
+  # --- INSIGHT OTOMATIS (LETakkan setelah data_sales()) ---
+  output$insightBox <- renderUI({
+    req(data_sales())
+    
+    df <- data_sales()
+    
+    total_penjualan <- sum(df$Harga, na.rm = TRUE)
+    rata2_harga     <- mean(df$Harga, na.rm = TRUE)
+    merk_terbanyak  <- names(sort(table(df$Merk), decreasing = TRUE))[1]
+    type_termahal   <- df$Type[which.max(df$Harga)]
+    
+    box(
+      width = 12,
+      status = "success",
+      solidHeader = TRUE,
+      title = "Insight Otomatis",
+      
+      tags$ul(
+        tags$li(paste("Total nilai penjualan:", scales::comma(total_penjualan))),
+        tags$li(paste("Rata-rata harga:", scales::comma(rata2_harga))),
+        tags$li(paste("Merk paling banyak terjual:", merk_terbanyak)),
+        tags$li(paste("Type harga tertinggi:", type_termahal)),
+        tags$li(paste("Jumlah data (observations):", nrow(df)))
+      ),
+      
+      tags$h5("Distribusi Penjualan per Merk"),
+      plotlyOutput("insight_bar", height = "680px"),
+      plotlyOutput("insight_hist", height = "380px")
+      
+    )
+  })
+  output$insight_bar <- renderPlot({
+    req(data_sales())
+    df <- data_sales()
+    
+    freq <- sort(table(df$Merk), decreasing = TRUE)
+    
+    barplot(
+      freq,
+      las = 2,
+      main = "",
+      ylab = "Jumlah",
+      xlab = "",
+      cex.names = 1.3,   # ukuran teks nama merk
+      cex.axis = 1.2,    # ukuran angka axis
+      cex.lab  = 1.3     # ukuran label sumbu
+    )
+  })
+  
   
   # -------- Theme Selector (Tidak berubah) --------
   sel <- reactiveValues(nav = "primary", side = "terbaik", accent = "primary", side_dark = FALSE)
@@ -528,6 +614,28 @@ server <- function(input, output, session) {
       observeEvent(input[[paste0("accent_color_",color_key)]], { sel$accent <- color_key }, ignoreInit = TRUE)
     })
   }
+  output$insight_bar <- renderPlotly({
+    req(data_sales())
+    
+    df <- data_sales()
+    df_summary <- df %>% 
+      dplyr::count(Merk, name = "Jumlah")
+    
+    plot_ly(
+      data = df_summary,
+      x = ~Merk,
+      y = ~Jumlah,
+      type = "bar",
+      hoverinfo = "text",
+      text = ~paste("Merk:", Merk, "<br>Jumlah:", Jumlah)
+    ) %>% 
+      layout(
+        xaxis = list(title = "Merk"),
+        yaxis = list(title = "Jumlah Terjual"),
+        margin = list(l = 40, r = 20, b = 40, t = 10)
+      )
+  })
+  
   
   observeEvent(input$sidebar_dark, { sel$side_dark <- isTRUE(input$sidebar_dark) }, ignoreInit = TRUE)
   
@@ -796,7 +904,7 @@ server <- function(input, output, session) {
       # PENTING: Pemicu pembaruan status akun
       rv$user_update_trigger <- rv$user_update_trigger + 1 
       
-      showNotification("Data berhasil di-*upload* dan diproses! Lihat tab Analisis Penjualan.", type = "message")
+      showNotification("Data berhasil di-*upload* dan diproses!", type = "message")
       
     })
   })
