@@ -30,7 +30,6 @@ APP_TITLE <- "KELOMPOK 2"
 
 db_connect <- function() DBI::dbConnect(SQLite(), DB_FILE)
 
-# --- FUNGSI DB INIT DENGAN PENAMBAHAN KOLOM photo_path DAN 4 ADMIN BARU ---
 init_db <- function(db_file = DB_FILE) {
   tryCatch({
     con <- dbConnect(SQLite(), db_file)
@@ -39,7 +38,7 @@ init_db <- function(db_file = DB_FILE) {
     # Password default untuk semua admin baru
     admin_pw <- password_store("admin123")
     
-    # DAFTAR 4 ADMIN YANG DIINGINKAN
+    # DAFTAR 4 ADMIN
     target_admins <- list(
       list(email = "FIRMAN@local", role = "admin", stars = 9999),
       list(email = "WAHYUDI@local", role = "admin", stars = 9999),
@@ -61,20 +60,18 @@ init_db <- function(db_file = DB_FILE) {
       }
       
     } else {
-      # PENAMBAHAN KOLOM photo_path JIKA TABEL SUDAH ADA (Kode dipertahankan)
+      # PENAMBAHAN KOLOM photo_path JIKA TABEL SUDAH ADA
       existing_cols <- dbListFields(con, "users")
       if (!"photo_path" %in% existing_cols) {
         dbExecute(con, "ALTER TABLE users ADD COLUMN photo_path TEXT DEFAULT 'default_user.jpg'")
       }
       
-      # Pastikan 4 Admin baru dimasukkan jika mereka tidak ada (khusus untuk skenario DB sudah ada)
       for (admin in target_admins) {
         existing <- dbGetQuery(con, "SELECT COUNT(*) FROM users WHERE email = ?", params = list(admin$email))$"COUNT(*)"
         if (existing == 0) {
           dbExecute(con, "INSERT INTO users (email, password_hash, role, stars, uploads_used, photo_path) VALUES (?, ?, ?, ?, 0, 'default_user.jpg')", 
                     params = list(admin$email, admin_pw, admin$role, admin$stars))
         } else {
-          # Update akun yang sudah ada untuk memastikan role dan passwordnya benar
           dbExecute(con, "UPDATE users SET role = 'admin', stars = 9999, password_hash = ? WHERE email = ?", 
                     params = list(admin_pw, admin$email))
         }
@@ -124,7 +121,6 @@ create_user <- function(email, password, initial_stars = 3, role = "user") {
   con <- db_connect(); on.exit(dbDisconnect(con), add = TRUE)
   pw_hash <- password_store(password)
   tryCatch({
-    # BARIS INI DIMODIFIKASI UNTUK photo_path
     dbExecute(con, "INSERT INTO users (email, password_hash, role, stars, uploads_used, photo_path) VALUES (?, ?, ?, ?, 0, 'default_user.jpg')", params = list(email, pw_hash, role, as.integer(initial_stars)))
     TRUE
   }, error = function(e) FALSE)
@@ -258,12 +254,10 @@ ui <- bs4DashPage(
     status = "primary",
     
     # --- MODIFIKASI UNTUK FITUR FOTO DINAMIS YANG DAPAT DIKLIK ---
-    # 1. Tambahkan ID 'user_panel_container' pada div pembungkus
     div(id = "user_panel_container", 
         uiOutput("dynamic_user_panel")
     ),
     
-    # 2. HILANGKAN tombol actionButton("btn_change_photo", ...) di sini.
     
     # --- END MODIFIKASI FOTO DINAMIS ---
     
@@ -316,6 +310,10 @@ ui <- bs4DashPage(
     use_waiter(),
     waiter_show_on_load(html = loading_html(), color = "#ffffff"),
     uiOutput("ui_fresh_theme"),
+    
+    tags$head(
+      tags$link(rel = "icon", href = "favicon.png", type = "image/x-icon")
+    ),
     
     tags$head(
       tags$style(HTML("
@@ -647,7 +645,6 @@ server <- function(input, output, session) {
   })
   
   # === JS OBSERVER UNTUK MENGGANTIKAN TOMBOL GANTI FOTO ===
-  # Ketika elemen dengan ID 'user_panel_container' diklik, kirim sinyal ke server.
   observe({
     shinyjs::onclick("user_panel_container", {
       if (isTRUE(user_session$logged_in)) {
